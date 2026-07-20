@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { isMobile } from '@/lib/utils';
-import { FlipHorizontal, Pause, Play, RefreshCw } from 'lucide-react';
+import { FlipHorizontal, Pause, Play, RefreshCw, Download } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import * as ResizablePrimitive from 'react-resizable-panels';
 
@@ -27,12 +27,17 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	// 内容元素
 	const txtRef = useRef<HTMLPreElement>(null);
-	// 字体大小
-	const [fontSize, setFontSize] = useState(isVideo ? 5 : 4);
+	// 字符分辨率（列数x行数）
+	const [charWidth, setCharWidth] = useState(isVideo ? 80 : 100);
+	const [charHeight, setCharHeight] = useState(isVideo ? 60 : 80);
+	// 帧间隔（毫秒），值越小帧率越高
+	const [frameInterval, setFrameInterval] = useState(20);
 	// 是否展示视频
 	const [showVideo, setShowVideo] = useState(true);
 	// ASCII 文本
 	const [asciiText, setAsciiText] = useState('');
+	// 多帧数据（用于视频导出）
+	const [frames, setFrames] = useState<string[]>([]);
 	// 定时器
 	const intervalIdRef = useRef<NodeJS.Timeout>();
 	// ascii 内容 ref
@@ -111,10 +116,16 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 				const imgDataWidth = imgData.width;
 				const imgDataHeight = imgData.height;
 
-				let html = '';
-				for (let h = 0; h < imgDataHeight; h += fontSize) {
+				// 根据目标字符分辨率计算采样步长
+				const stepX = imgDataWidth / charWidth;
+				const stepY = imgDataHeight / charHeight;
+
+				const lines: string[] = [];
+				for (let row = 0; row < charHeight; row++) {
+					const h = Math.floor(row * stepY);
 					let p = '';
-					for (let w = 0; w < imgDataWidth; w += fontSize / 2) {
+					for (let col = 0; col < charWidth; col++) {
+						const w = Math.floor(col * stepX);
 						const index = (w + imgDataWidth * h) * 4;
 						const r = imgDataArr[index + 0];
 						const g = imgDataArr[index + 1];
@@ -122,10 +133,9 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 						const gray = getGray(r, g, b);
 						p += toText(gray);
 					}
-					p += '\n';
-					html += p;
+					lines.push(p);
 				}
-				setAsciiText(html);
+				setAsciiText(lines.join('\n'));
 			};
 			img.src = previewUrl;
 			return; // 提前返回，避免执行后续视频相关的代码
@@ -136,11 +146,16 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 		const imgDataWidth = imgData.width;
 		const imgDataHeight = imgData.height;
 
-		let html = '';
+		// 根据目标字符分辨率计算采样步长
+		const stepX = imgDataWidth / charWidth;
+		const stepY = imgDataHeight / charHeight;
 
-		for (let h = 0; h < imgDataHeight; h += fontSize) {
+		const lines: string[] = [];
+		for (let row = 0; row < charHeight; row++) {
+			const h = Math.floor(row * stepY);
 			let p = '';
-			for (let w = 0; w < imgDataWidth; w += fontSize / 2) {
+			for (let col = 0; col < charWidth; col++) {
+				const w = Math.floor(col * stepX);
 				const index = (w + imgDataWidth * h) * 4;
 				const r = imgDataArr[index + 0];
 				const g = imgDataArr[index + 1];
@@ -148,11 +163,15 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 				const gray = getGray(r, g, b);
 				p += toText(gray);
 			}
-			p += '\n';
-			html += p;
+			lines.push(p);
 		}
+		const html = lines.join('\n');
 
 		setAsciiText(html);
+		// 将当前帧添加到frames数组（视频导出用）
+		if (isVideo) {
+			setFrames((prev) => [...prev, html]);
+		}
 	};
 
 	// 处理图片和视频的效果
@@ -168,7 +187,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 			// 只有在更新状态为 true 时才设置定时器
 			if (isUpdating) {
 				if (isVideoPlaying) {
-					intervalIdRef.current = setInterval(convert, 20);
+					intervalIdRef.current = setInterval(convert, frameInterval);
 				} else {
 					setTimeout(() => {
 						convert();
@@ -182,7 +201,15 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 				clearInterval(intervalIdRef.current);
 			}
 		};
-	}, [file, previewUrl, fontSize, isUpdating, isVideoPlaying]);
+	}, [
+		file,
+		previewUrl,
+		charWidth,
+		charHeight,
+		isUpdating,
+		isVideoPlaying,
+		frameInterval
+	]);
 	const togglePlay = async () => {
 		if (videoRef.current) {
 			if (videoRef.current.paused) {
@@ -204,6 +231,28 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 		setIsUpdating(true); // 重启时开启更新
 	};
 
+	const exportJson = () => {
+		const fps = Math.round(1000 / frameInterval);
+		const data = {
+			fps,
+			width: charWidth,
+			height: charHeight,
+			frames: isVideo ? frames : [asciiText]
+		};
+		const json = JSON.stringify(data, null, 2);
+		const blob = new Blob([json], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${file.name.replace(/\.[^.]+$/, '')}_ascii.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
+	const clearFrames = () => {
+		setFrames([]);
+	};
+
 	return (
 		<Card className="w-full">
 			<CardHeader>
@@ -213,6 +262,16 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 					<Button onClick={() => setShowVideo(!showVideo)} variant="outline">
 						{showVideo ? '隐藏' : '显示'}原始内容
 					</Button>
+					{!isVideo && (
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={exportJson}
+							title="导出JSON"
+						>
+							<Download className="h-4 w-4" />
+						</Button>
+					)}
 					{isVideo && (
 						<div className="flex items-center gap-2">
 							<Button variant="outline" size="icon" onClick={togglePlay}>
@@ -225,20 +284,90 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 							<Button variant="outline" size="icon" onClick={restart}>
 								<RefreshCw className="h-4 w-4" />
 							</Button>
+							<Button
+								variant="outline"
+								size="icon"
+								onClick={clearFrames}
+								title="清空帧数据"
+							>
+								清空
+							</Button>
+							<Button
+								variant="outline"
+								size="icon"
+								onClick={exportJson}
+								title="导出JSON"
+							>
+								<Download className="h-4 w-4" />
+							</Button>
+							<span className="text-xs text-muted-foreground">
+								已采集 {frames.length} 帧
+							</span>
 						</div>
 					)}
 					<div className="flex flex-1 items-center gap-4">
-						<span className="text-sm">字体大小</span>
-						<Slider
-							value={[fontSize]}
-							onValueChange={(values) => setFontSize(values[0])}
-							min={2}
-							max={16}
-							step={1}
-							className="w-[200px]"
+						<span className="text-sm">字符分辨率</span>
+						<input
+							type="number"
+							value={charWidth}
+							onChange={(e) => {
+								const val = parseInt(e.target.value);
+								if (!isNaN(val) && val >= 10 && val <= 500) {
+									setCharWidth(val);
+								}
+							}}
+							min={10}
+							max={500}
+							className="w-16 px-2 py-1 text-sm border rounded"
 						/>
-						<span className="text-sm">{fontSize}px</span>
+						<span className="text-sm">x</span>
+						<input
+							type="number"
+							value={charHeight}
+							onChange={(e) => {
+								const val = parseInt(e.target.value);
+								if (!isNaN(val) && val >= 10 && val <= 500) {
+									setCharHeight(val);
+								}
+							}}
+							min={10}
+							max={500}
+							className="w-16 px-2 py-1 text-sm border rounded"
+						/>
+						<span className="text-xs text-muted-foreground">
+							字符 (共{charWidth * charHeight}个)
+						</span>
 					</div>
+					{isVideo && (
+						<div className="flex flex-1 items-center gap-4">
+							<span className="text-sm">帧间隔</span>
+							<Slider
+								value={[frameInterval]}
+								onValueChange={(values) => setFrameInterval(values[0])}
+								min={10}
+								max={100}
+								step={10}
+								className="w-[150px]"
+							/>
+							<input
+								type="number"
+								value={frameInterval}
+								onChange={(e) => {
+									const val = parseInt(e.target.value);
+									if (!isNaN(val) && val >= 10 && val <= 100) {
+										setFrameInterval(val);
+									}
+								}}
+								min={10}
+								max={100}
+								className="w-16 px-2 py-1 text-sm border rounded"
+							/>
+							<span className="text-sm">ms</span>
+							<span className="text-xs text-muted-foreground">
+								(~{Math.round(1000 / frameInterval)} FPS)
+							</span>
+						</div>
+					)}
 				</div>
 			</CardHeader>
 			<CardContent>
@@ -286,13 +415,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 						<pre
 							ref={txtRef}
 							onClick={togglePlay}
-							className=" leading-none whitespace-pre cursor-pointer"
-							style={{
-								fontSize: `${fontSize}px`,
-								transform: asciiText
-									? `scale(${fontSize * 0.167}, ${fontSize / 5})`
-									: 'none'
-							}}
+							className=" leading-none whitespace-pre cursor-pointer text-[4px]"
 						>
 							{asciiText}
 							{!asciiText && (
