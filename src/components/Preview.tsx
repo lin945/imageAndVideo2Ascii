@@ -39,7 +39,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 	// 多帧数据（用于视频导出）
 	const [frames, setFrames] = useState<string[]>([]);
 	// 定时器
-	const intervalIdRef = useRef<NodeJS.Timeout>();
+	const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
 	// ascii 内容 ref
 	const imageRef = useRef<HTMLImageElement>(null);
 	// 视频是否真正播放中
