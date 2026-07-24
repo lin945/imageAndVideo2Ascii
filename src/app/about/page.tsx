@@ -70,8 +70,8 @@ export default function AboutPage() {
 							从暗到亮的 ASCII 字符序列：
 							<br />
 							<code className="text-base">#&$*o!; </code>
-							<p className="text-base">最后空白的就是空格哦！ </p>
 						</p>
+						<span className="text-base">最后空白的就是空格哦！ </span>
 						<p className="mt-2 text-sm text-muted-foreground">
 							字符的选择基于其在等宽字体下的视觉密度，确保最终效果的视觉连续性和艺术性。
 						</p>
