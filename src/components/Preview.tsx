@@ -164,6 +164,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 		}
 	};
 
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	useEffect(() => {
 		if (!isVideo) {
 			convert();
@@ -187,7 +188,16 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 				clearInterval(intervalIdRef.current);
 			}
 		};
-	}, [file, previewUrl, charWidth, charHeight, isUpdating, isVideoPlaying, frameInterval, isVideo]);
+	}, [
+		file,
+		previewUrl,
+		charWidth,
+		charHeight,
+		isUpdating,
+		isVideoPlaying,
+		frameInterval,
+		isVideo
+	]);
 
 	useEffect(() => {
 		const video = videoRef.current;
@@ -370,7 +380,9 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 					</div>
 					<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 						<div className="space-y-1">
-							<span className="text-xs text-muted-foreground">预估JSON大小</span>
+							<span className="text-xs text-muted-foreground">
+								预估JSON大小
+							</span>
 							<p className="text-sm font-medium tabular-nums">
 								{formatSize(estimatedJsonBytes)}
 							</p>
@@ -382,7 +394,9 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 							</p>
 						</div>
 						<div className="space-y-1">
-							<span className="text-xs text-muted-foreground">已采集 / 总帧数</span>
+							<span className="text-xs text-muted-foreground">
+								已采集 / 总帧数
+							</span>
 							<p className="text-sm font-medium tabular-nums">
 								{frames.length}
 								{isVideo && (
@@ -427,22 +441,14 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 						)}
 						{isVideo && (
 							<>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={togglePlay}
-								>
+								<Button variant="outline" size="icon" onClick={togglePlay}>
 									{isVideoPlaying ? (
 										<Pause className="h-4 w-4" />
 									) : (
 										<Play className="h-4 w-4" />
 									)}
 								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={restart}
-								>
+								<Button variant="outline" size="icon" onClick={restart}>
 									<RefreshCw className="h-4 w-4" />
 								</Button>
 								<Button
@@ -496,9 +502,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 							>
 								{asciiText}
 								{!asciiText && (
-									<span className="!text-[16px]">
-										等待生成 ASCII 内容...
-									</span>
+									<span className="!text-[16px]">等待生成 ASCII 内容...</span>
 								)}
 							</pre>
 						</div>
@@ -553,9 +557,7 @@ export function Preview({ file, previewUrl }: PreviewProps) {
 								>
 									{asciiText}
 									{!asciiText && (
-										<span className="!text-[16px]">
-											等待生成 ASCII 内容...
-										</span>
+										<span className="!text-[16px]">等待生成 ASCII 内容...</span>
 									)}
 								</pre>
 							</ResizablePrimitive.Panel>
